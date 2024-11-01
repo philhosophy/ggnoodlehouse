@@ -1,0 +1,87 @@
+# GG Noodle House - Technical Specification
+
+## Project Overview
+Browser-based therapeutic game featuring conversations with "Uncle", an AI-powered noodle shop owner.
+
+## Tech Stack
+- Frontend: Phaser.js + TypeScript + Vite
+- Game Engine: Phaser 3
+- Build Tool: Vite
+- Language: TypeScript
+- State Management: Phaser Scene Manager
+- AI Integration: LLM API (to be implemented)
+
+## Core Components
+
+### 1. Game Scene (NoodleHouseScene.ts)
+- Manages game canvas and sprite animations
+- Handles chat UI integration
+- Controls speech bubble rendering
+- Manages user input and interaction
+
+### 2. Uncle Character
+- Sprite Size: 64x64 pixels
+- Animations:
+  - Idle
+  - Talking
+  - Cooking
+- Location: Center-left of screen
+- Speech Bubble: Dynamically sized based on text content
+
+### 3. Chat System
+- Integrated directly in Phaser scene
+- Custom pixel-art style UI elements
+- Input handling via HTMLInput overlay
+- Message history management
+- Speech bubble animation system
+
+### 4. Future Features (Not Implemented)
+- Knowledge Graph Generation
+  - Extract player personality traits
+  - Store conversation history
+  - Build interest profile
+- Player Matchmaking
+  - Compatibility scoring
+  - Real-time player-to-player chat
+  - Session management
+
+## Project Structure
+```
+src/
+├── game/
+│   ├── scenes/
+│   │   └── NoodleHouseScene.ts
+│   ├── sprites/
+│   │   └── Uncle.ts
+│   └── config/
+│       └── gameConfig.ts
+├── services/
+│   └── api/
+│       ├── chatService.ts
+│       └── matchmakingService.ts
+└── types/
+    └── index.d.ts
+```
+
+## Setup Instructions
+1. Install dependencies: `npm install`
+2. Development server: `npm run dev`
+3. Build: `npm run build`
+
+## Important Notes
+- Speech bubbles need manual cleanup when destroyed
+- Chat input uses DOM overlay - handle cleanup in scene destroy
+- Uncle sprite requires manual asset conversion from SVG to PNG
+- LLM API integration pending - currently using placeholder responses
+
+## Next Steps
+1. Implement LLM API integration
+2. Add conversation history storage
+3. Create knowledge graph system
+4. Develop matchmaking service
+5. Add player-to-player chat functionality
+
+## Known Issues
+- Chat input positioning may need adjustment on different screen sizes
+- Speech bubble arrow positioning needs refinement
+- Asset loading requires manual SVG to PNG conversion
