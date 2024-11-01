@@ -8,8 +8,6 @@ export class NoodleHouseScene extends Phaser.Scene {
   private debugText!: Phaser.GameObjects.Text;
   private debugMode: boolean = false;
   private resizeHandles: Phaser.GameObjects.Container[] = [];
-  private initialScale: number = 1;
-  private initialDistance: number = 0;
 
   constructor() {
     super({ key: 'NoodleHouseScene' });
@@ -53,24 +51,12 @@ export class NoodleHouseScene extends Phaser.Scene {
     // Update debug text
     this.debugText.setText(`Press D to toggle debug mode\nDebug: ${this.debugMode ? 'ON' : 'OFF'}`);
 
-    // Clean up existing handles first
-    this.resizeHandles.forEach(handle => handle.destroy());
-    this.resizeHandles = [];
-
     if (this.debugMode) {
       // Make elements draggable
       this.enableDragging(this.uncle);
       if (this.speechBubble) {
         this.enableDragging(this.speechBubble);
       }
-
-      // Add resize handles with a slight delay to ensure proper positioning
-      this.time.delayedCall(100, () => {
-        this.createResizeHandles(this.uncle);
-        if (this.speechBubble) {
-          this.createResizeHandles(this.speechBubble);
-        }
-      });
 
       // Add position indicators
       this.updatePositionIndicators();
@@ -101,12 +87,16 @@ export class NoodleHouseScene extends Phaser.Scene {
         object.y = dragY;
       }
       this.updatePositionIndicators();
+      this.updateResizeHandles(object);
     });
 
     // Add visual indicator that element is draggable
     if (object instanceof Phaser.GameObjects.Sprite) {
       object.setTint(0x00ff00);
     }
+
+    // Add resize handles
+    this.createResizeHandles(object);
   }
 
   private disableDragging(object: Phaser.GameObjects.GameObject) {
@@ -114,6 +104,9 @@ export class NoodleHouseScene extends Phaser.Scene {
     if (object instanceof Phaser.GameObjects.Sprite) {
       object.clearTint();
     }
+    // Remove resize handles
+    this.resizeHandles.forEach(handles => handles.destroy());
+    this.resizeHandles = [];
   }
 
   private updatePositionIndicators() {
@@ -140,7 +133,20 @@ export class NoodleHouseScene extends Phaser.Scene {
   }
 
   private addPositionText(container: Phaser.GameObjects.Container, x: number, y: number, label: string) {
-    const text = this.add.text(x, y, `${label}\nx: ${Math.round(x)}\ny: ${Math.round(y)}`, {
+    const object = label === 'Uncle' ? this.uncle : this.speechBubble;
+    let scaleInfo = '';
+    
+    if (object instanceof Phaser.GameObjects.Sprite) {
+      scaleInfo = `\nscale: ${object.scale.toFixed(2)}`;
+    } else if (object instanceof Phaser.GameObjects.Container) {
+      const firstChild = object.first as Phaser.GameObjects.Image;
+      if (firstChild) {
+        scaleInfo = `\nscale: ${firstChild.scale.toFixed(2)}`;
+      }
+    }
+
+    const text = this.add.text(x, y, 
+      `${label}\nx: ${Math.round(x)}\ny: ${Math.round(y)}${scaleInfo}`, {
       fontFamily: 'Arial',
       fontSize: '14px',
       color: '#ffffff',
@@ -159,9 +165,13 @@ export class NoodleHouseScene extends Phaser.Scene {
   }
 
   private createSpeechBubble(x: number, y: number, quote: string) {
-    // Remove old speech bubble if it exists
+    // Remove old speech bubble and its resize handles
     if (this.speechBubble) {
-      this.speechBubble.destroy();
+        // Remove resize handles first
+        this.resizeHandles.forEach(handles => handles.destroy());
+        this.resizeHandles = [];
+        // Then destroy the speech bubble
+        this.speechBubble.destroy();
     }
 
     // Create container for speech bubble and text
@@ -178,12 +188,12 @@ export class NoodleHouseScene extends Phaser.Scene {
     
     // Add pixel-style text
     const content = this.add.text(0, 0, quote, {
-      fontFamily: '"Press Start 2P"',
-      fontSize: '8px',
-      color: '#000000',
-      align: 'center',
-      wordWrap: { width: bubbleWidth - (padding * 2) },
-      lineSpacing: 6
+        fontFamily: '"Press Start 2P"',
+        fontSize: '8px',
+        color: '#000000',
+        align: 'center',
+        wordWrap: { width: bubbleWidth - (padding * 2) },
+        lineSpacing: 6
     });
 
     // Center the text
@@ -196,17 +206,18 @@ export class NoodleHouseScene extends Phaser.Scene {
     // Fade-in effect
     this.speechBubble.setAlpha(0);
     this.tweens.add({
-      targets: this.speechBubble,
-      alpha: 1,
-      duration: 200,
-      ease: 'Power1'
+        targets: this.speechBubble,
+        alpha: 1,
+        duration: 200,
+        ease: 'Power1',
+        onComplete: () => {
+            // Re-enable debug mode features if active
+            if (this.debugMode) {
+                this.enableDragging(this.speechBubble);
+                this.updatePositionIndicators();
+            }
+        }
     });
-
-    // If debug mode is on, make the new speech bubble draggable
-    if (this.debugMode) {
-      this.enableDragging(this.speechBubble);
-      this.updatePositionIndicators();
-    }
   }
 
   private createChatInput() {
@@ -277,14 +288,8 @@ export class NoodleHouseScene extends Phaser.Scene {
     }
   }
 
-  shutdown() {
-    if (this.chatInput) {
-      this.chatInput.remove();
-    }
-  }
-
-  private createResizeHandles(object: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container) {
-    const handleSize = 16;
+  private createResizeHandles(object: Phaser.GameObjects.GameObject) {
+    const handleSize = 10;
     const handles = new Phaser.GameObjects.Container(this, 0, 0);
     this.add.existing(handles);
     
@@ -292,19 +297,20 @@ export class NoodleHouseScene extends Phaser.Scene {
     let bounds;
     if (object instanceof Phaser.GameObjects.Sprite) {
       bounds = {
-        x: object.x - (object.displayWidth * object.scaleX)/2,
-        y: object.y - (object.displayHeight * object.scaleY)/2,
-        width: object.displayWidth * object.scaleX,
-        height: object.displayHeight * object.scaleY
+        x: object.x - object.displayWidth/2,
+        y: object.y - object.displayHeight/2,
+        width: object.displayWidth,
+        height: object.displayHeight
       };
     } else if (object instanceof Phaser.GameObjects.Container) {
+      // Get the first child (bubble image) for reference
       const bubbleImage = object.list[0] as Phaser.GameObjects.Image;
       if (bubbleImage) {
         bounds = {
-          x: object.x - (bubbleImage.displayWidth * bubbleImage.scaleX)/2,
-          y: object.y - (bubbleImage.displayHeight * bubbleImage.scaleY)/2,
-          width: bubbleImage.displayWidth * bubbleImage.scaleX,
-          height: bubbleImage.displayHeight * bubbleImage.scaleY
+          x: object.x - (bubbleImage.displayWidth * bubbleImage.scale)/2,
+          y: object.y - (bubbleImage.displayHeight * bubbleImage.scale)/2,
+          width: bubbleImage.displayWidth * bubbleImage.scale,
+          height: bubbleImage.displayHeight * bubbleImage.scale
         };
       }
     }
@@ -313,104 +319,65 @@ export class NoodleHouseScene extends Phaser.Scene {
 
     // Create corner handles
     const positions = [
-      { x: bounds.x, y: bounds.y, type: 'nw' },
-      { x: bounds.x + bounds.width, y: bounds.y, type: 'ne' },
-      { x: bounds.x, y: bounds.y + bounds.height, type: 'sw' },
-      { x: bounds.x + bounds.width, y: bounds.y + bounds.height, type: 'se' }
+      { x: bounds.x, y: bounds.y, cursor: 'nw-resize' },
+      { x: bounds.x + bounds.width, y: bounds.y, cursor: 'ne-resize' },
+      { x: bounds.x, y: bounds.y + bounds.height, cursor: 'sw-resize' },
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height, cursor: 'se-resize' }
     ];
 
     positions.forEach(pos => {
-      // Create outer border for better visibility
-      const outerBorder = this.add.rectangle(pos.x, pos.y, handleSize + 4, handleSize + 4, 0x000000, 1);
-      const handle = this.add.rectangle(pos.x, pos.y, handleSize, handleSize, 0x00ff00, 0.8);
-      
-      outerBorder.setOrigin(0.5);
+      const handle = this.add.rectangle(pos.x, pos.y, handleSize, handleSize, 0x00ff00);
+      handle.setInteractive({ draggable: true, cursor: pos.cursor });
       handle.setOrigin(0.5);
-      handle.setDepth(1000); // Ensure handles are always visible
-      outerBorder.setDepth(999);
       
-      // Make handle interactive
-      handle.setInteractive({ 
-        draggable: true,
-        useHandCursor: true,
-        hitArea: new Phaser.Geom.Rectangle(-handleSize/2, -handleSize/2, handleSize, handleSize),
-        hitAreaCallback: Phaser.Geom.Rectangle.Contains
-      });
-      
-      // Visual feedback
-      handle.on('pointerover', () => {
-        handle.setFillStyle(0x00ff00, 1);
-        outerBorder.setStrokeStyle(2, 0xffffff);
-      });
-      
-      handle.on('pointerout', () => {
-        handle.setFillStyle(0x00ff00, 0.8);
-        outerBorder.setStrokeStyle(0);
-      });
-      
-      // Resize logic
-      handle.on('dragstart', () => {
-        if (object instanceof Phaser.GameObjects.Sprite) {
-          this.initialScale = object.scaleX; // Use scaleX instead of scale
-        } else if (object instanceof Phaser.GameObjects.Container) {
-          const firstChild = object.list[0] as Phaser.GameObjects.Image;
-          if (firstChild) {
-            this.initialScale = firstChild.scaleX;
-          }
-        }
-        
-        this.initialDistance = Phaser.Math.Distance.Between(
-          object.x, object.y,
-          pos.x, pos.y
-        );
-      });
-
       handle.on('drag', (pointer: Phaser.Input.Pointer, dragX: number, dragY: number) => {
-        const newDistance = Phaser.Math.Distance.Between(
-          object.x, object.y,
-          dragX, dragY
-        );
-
-        const scaleFactor = newDistance / this.initialDistance;
-        const newScale = this.initialScale * scaleFactor;
-        const limitedScale = Phaser.Math.Clamp(newScale, 0.2, 3.0);
+        const deltaX = dragX - handle.x;
+        const deltaY = dragY - handle.y;
+        handle.x = dragX;
+        handle.y = dragY;
 
         if (object instanceof Phaser.GameObjects.Sprite) {
-          object.setScale(limitedScale);
+          // More precise scaling for sprites
+          const currentScale = object.scale;
+          const scaleChange = (deltaX + deltaY) * 0.005; // Adjust this multiplier to control sensitivity
+          const newScale = Math.max(0.1, currentScale + scaleChange); // Prevent negative or zero scale
+          object.setScale(newScale);
         } else if (object instanceof Phaser.GameObjects.Container) {
+          // Scale container contents
+          const scaleChange = (deltaX + deltaY) * 0.005; // Adjust sensitivity as needed
           object.list.forEach((child) => {
             if (child instanceof Phaser.GameObjects.Image || 
                 child instanceof Phaser.GameObjects.Text) {
-              child.setScale(limitedScale);
+              const newScale = Math.max(0.1, child.scale + scaleChange);
+              child.setScale(newScale);
             }
           });
         }
 
-        // Update handles position
-        this.createResizeHandles(object);
+        this.updateResizeHandles(object);
+        this.updatePositionIndicators();
       });
 
-      handles.add([outerBorder, handle]);
+      handles.add(handle);
     });
 
     this.resizeHandles.push(handles);
     return handles;
   }
 
-  private updateResizeHandles(object: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container) {
-    const existingHandles = this.resizeHandles.find(handles => 
-      handles.getData('target') === object
-    );
-    if (existingHandles) {
-      existingHandles.destroy();
-      this.resizeHandles = this.resizeHandles.filter(h => h !== existingHandles);
-    }
-    
+  private updateResizeHandles(object: Phaser.GameObjects.GameObject) {
+    // Remove existing handles
+    this.resizeHandles.forEach(handles => handles.destroy());
+    this.resizeHandles = [];
+
     if (this.debugMode) {
-      const newHandles = this.createResizeHandles(object);
-      if (newHandles) {
-        newHandles.setData('target', object);
-      }
+      this.createResizeHandles(object);
+    }
+  }
+
+  shutdown() {
+    if (this.chatInput) {
+      this.chatInput.remove();
     }
   }
 }
