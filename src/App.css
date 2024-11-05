@@ -40,3 +40,27 @@
 .read-the-docs {
   color: #888;
 }
+
+.icon-container {
+  display: flex;
+  gap: 20px;
+  /* ... any existing styles */
+}
+
+.icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.icon img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
+.icon span {
+  font-size: 12px;
+  margin-top: 4px;
+}

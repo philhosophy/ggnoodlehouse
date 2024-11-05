@@ -14,6 +14,8 @@ export class NoodleHouseScene extends Phaser.Scene {
   private jukebox!: Phaser.GameObjects.Sprite;
   private music!: Phaser.Sound.BaseSound;
   private isPlaying: boolean = false;
+  private notebook!: Phaser.GameObjects.Sprite;
+  private isNotebookOpen: boolean = false;
 
   constructor() {
     super({ key: 'NoodleHouseScene' });
@@ -24,6 +26,7 @@ export class NoodleHouseScene extends Phaser.Scene {
     this.load.image('uncle_portrait', '/src/assets/uncle.png');
     this.load.image('jukebox', '/src/assets/jukebox.png');
     this.load.audio('bgMusic', '/src/assets/fly.mp3');
+    this.load.image('notebook_icon', '/src/assets/notebook.png');
   }
 
   create() {
@@ -46,6 +49,7 @@ export class NoodleHouseScene extends Phaser.Scene {
 
     // Add this after background setup but before chat interface
     this.createJukebox();
+    this.createNotebook();
   }
 
   private createDialogueBox() {
@@ -177,6 +181,9 @@ export class NoodleHouseScene extends Phaser.Scene {
     try {
       this.startThinking();
       
+      // Save player's message first
+      this.saveToHistory(message, true);
+      
       console.log('Sending message to backend:', message);
       
       const response = await fetch('http://localhost:8000/chat', {
@@ -195,14 +202,35 @@ export class NoodleHouseScene extends Phaser.Scene {
       console.log('Received response:', data);
       
       this.stopThinking();
+      // Save Uncle's response
+      this.saveToHistory(data.response, false);
       await this.typewriterEffect(data.response);
     } catch (error) {
       console.error('Error:', error);
       this.stopThinking();
-      await this.typewriterEffect(
-        "Ah, sorry... I'm having trouble hearing you over the cooking. Could you repeat that?"
-      );
+      const errorMessage = "Ah, sorry... I'm having trouble hearing you over the cooking. Could you repeat that?";
+      this.saveToHistory(errorMessage, false);
+      await this.typewriterEffect(errorMessage);
     }
+  }
+
+  private saveToHistory(content: string, isUserMessage: boolean) {
+    const message = {
+      timestamp: new Date().toLocaleString(),
+      sender: isUserMessage ? 'Phil' : 'Uncle',
+      content: content
+    };
+
+    // Get existing messages
+    const existingMessages = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+    const updatedMessages = [...existingMessages, message];
+    
+    // Save to localStorage
+    localStorage.setItem('chatHistory', JSON.stringify(updatedMessages));
+
+    // Emit event for React to update
+    const event = new CustomEvent('chatHistoryUpdated');
+    window.dispatchEvent(event);
   }
 
   private async typewriterEffect(text: string) {
@@ -243,7 +271,7 @@ export class NoodleHouseScene extends Phaser.Scene {
     );
     
     this.jukebox.setDisplaySize(jukeboxSize, jukeboxSize);
-    const originalScale = this.jukebox.scale; // Store original scale
+    const originalScale = this.jukebox.scale;
     
     // Load the music
     this.music = this.sound.add('bgMusic', {
@@ -254,13 +282,17 @@ export class NoodleHouseScene extends Phaser.Scene {
     // Make jukebox interactive
     this.jukebox.setInteractive();
     
-    // Add hover effect
+    // Add hover effect to match notebook
     this.jukebox.on('pointerover', () => {
       document.body.style.cursor = 'pointer';
+      this.jukebox.setAlpha(1);
     });
     
     this.jukebox.on('pointerout', () => {
       document.body.style.cursor = 'default';
+      if (!this.isPlaying) {
+        this.jukebox.setAlpha(0.7);
+      }
     });
 
     // Add click handler
@@ -269,14 +301,10 @@ export class NoodleHouseScene extends Phaser.Scene {
         this.music.stop();
         this.isPlaying = false;
         this.jukebox.setAlpha(0.7);
-        // Update cursor immediately on click
-        document.body.style.cursor = 'url(/src/assets/play-cursor.png), pointer';
       } else {
         this.music.play();
         this.isPlaying = true;
         this.jukebox.setAlpha(1);
-        // Update cursor immediately on click
-        document.body.style.cursor = 'url(/src/assets/pause-cursor.png), pointer';
       }
       // Ensure scale stays constant
       this.jukebox.setScale(originalScale);
@@ -284,6 +312,51 @@ export class NoodleHouseScene extends Phaser.Scene {
 
     // Start with slightly dimmed appearance
     this.jukebox.setAlpha(0.7);
+  }
+
+  private createNotebook() {
+    const { width } = this.scale;
+    const padding = 20;
+    const iconSize = 160;
+    const jukeboxBottom = padding + iconSize;
+    
+    this.notebook = this.add.sprite(
+      width - padding - iconSize/2,
+      jukeboxBottom + padding + iconSize/2,
+      'notebook_icon'
+    );
+    
+    this.notebook.setDisplaySize(iconSize, iconSize);
+    this.notebook.setInteractive();
+    
+    // Add hover effect
+    this.notebook.on('pointerover', () => {
+      document.body.style.cursor = 'pointer';
+      this.notebook.setAlpha(1);
+    });
+    
+    this.notebook.on('pointerout', () => {
+      document.body.style.cursor = 'default';
+      if (!this.isNotebookOpen) {
+        this.notebook.setAlpha(0.7);
+      }
+    });
+
+    // Add click handler
+    this.notebook.on('pointerdown', () => {
+      this.isNotebookOpen = !this.isNotebookOpen;
+      this.notebook.setAlpha(this.isNotebookOpen ? 1 : 0.7);
+      const event = new CustomEvent('toggleNotebook');
+      window.dispatchEvent(event);
+    });
+
+    // Listen for notebook close via × button
+    window.addEventListener('notebookClosed', () => {
+      this.isNotebookOpen = false;
+      this.notebook.setAlpha(0.7);
+    });
+
+    this.notebook.setAlpha(0.7);
   }
 
   shutdown() {
