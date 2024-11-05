@@ -3,10 +3,23 @@ import Phaser from 'phaser';
 import { NoodleHouseScene } from '../scenes/NoodleHouseScene';
 
 export const gameConfig = {
-  type: Phaser.AUTO,
+  type: Phaser.WEBGL,
   parent: 'phaser-game',
-  width: 800,
-  height: 600,
+  pixelArt: true,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  },
   scene: [NoodleHouseScene],
-  backgroundColor: '#000000'
+  backgroundColor: '#000000',
+  render: {
+    antialias: false,
+    pixelArt: true,
+    roundPixels: true
+  },
+  dom: {
+    createContainer: true
+  }
 };

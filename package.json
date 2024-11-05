@@ -4,13 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "frontend": "vite",
+    "backend": "cd backend && source venv/bin/activate && python3 main.py",
+    "dev": "cd backend && source venv/bin/activate && (python3 main.py & cd .. && npm run frontend)",
+    "setup": "cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
     "phaser": "^3.86.0",
     "postcss": "^8.4.47",
     "react": "^18.3.1",
